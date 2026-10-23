@@ -7,26 +7,40 @@ import com.samarth.matching.model.OrderType;
 import com.samarth.matching.model.Side;
 import com.samarth.matching.model.Trade;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class MatchingEngine {
-    private final Map<String, OrderBook> books = new HashMap<>();
-    private final List<Trade> tradeLog = new ArrayList<>();
-    private long nextOrderId = 1;
+    private final Map<String, OrderBook> books = new ConcurrentHashMap<>();
+    private final List<Trade> tradeLog = Collections.synchronizedList(new ArrayList<>());
+    private final AtomicLong nextOrderId = new AtomicLong(1);
+    private final boolean printTrades;
+
+    public MatchingEngine() {
+        this(true);
+    }
+
+    public MatchingEngine(boolean printTrades) {
+        this.printTrades = printTrades;
+    }
 
     public long placeLimitOrder(String symbol, Side side, long price, int quantity) {
         validate(symbol, quantity);
         if (price <= 0) {
             throw new InvalidOrderException("Limit price must be positive");
         }
-        Order order = new Order(nextOrderId++, symbol, side, OrderType.LIMIT, price, quantity);
+        Order order = new Order(nextOrderId.getAndIncrement(), symbol, side, OrderType.LIMIT, price, quantity);
         submit(order);
         return order.getId();
     }
 
     public long placeMarketOrder(String symbol, Side side, int quantity) {
         validate(symbol, quantity);
-        Order order = new Order(nextOrderId++, symbol, side, OrderType.MARKET, 0, quantity);
+        Order order = new Order(nextOrderId.getAndIncrement(), symbol, side, OrderType.MARKET, 0, quantity);
         submit(order);
         return order.getId();
     }
@@ -41,14 +55,18 @@ public class MatchingEngine {
     }
 
     public List<Trade> getTradeLog() {
-        return Collections.unmodifiableList(tradeLog);
+        synchronized (tradeLog) {
+            return List.copyOf(tradeLog);
+        }
     }
 
     private void submit(Order order) {
         OrderBook book = books.computeIfAbsent(order.getSymbol(), OrderBook::new);
         List<Trade> trades = book.process(order);
-        for (Trade t : trades) {
-            System.out.println(t);
+        if (printTrades) {
+            for (Trade t : trades) {
+                System.out.println(t);
+            }
         }
         tradeLog.addAll(trades);
     }

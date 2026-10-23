@@ -17,7 +17,7 @@ public class OrderBook {
         this.symbol = symbol;
     }
 
-    public List<Trade> process(Order incoming) {
+    public synchronized List<Trade> process(Order incoming) {
         List<Trade> trades = new ArrayList<>();
         TreeMap<Long, ArrayDeque<Order>> opposite = (incoming.getSide() == Side.BUY) ? asks : bids;
 
@@ -70,7 +70,7 @@ public class OrderBook {
         ordersById.put(order.getId(), order);
     }
 
-    public boolean cancel(long orderId) {
+    public synchronized boolean cancel(long orderId) {
         Order order = ordersById.remove(orderId);
         if (order == null) {
             return false;
@@ -84,7 +84,24 @@ public class OrderBook {
         return true;
     }
 
-    public void print() {
+    public synchronized Long getBestBid() {
+        return bids.isEmpty() ? null : bids.firstKey();
+    }
+
+    public synchronized Long getBestAsk() {
+        return asks.isEmpty() ? null : asks.firstKey();
+    }
+
+    public synchronized int getQuantityAt(Side side, long price) {
+        ArrayDeque<Order> queue = (side == Side.BUY) ? bids.get(price) : asks.get(price);
+        return (queue == null) ? 0 : totalQuantity(queue);
+    }
+
+    public synchronized boolean isEmpty() {
+        return bids.isEmpty() && asks.isEmpty();
+    }
+
+    public synchronized void print() {
         System.out.println("------ Order Book: " + symbol + " ------");
         System.out.println("SELL orders (asks):");
         asks.descendingMap().forEach((price, queue) ->
