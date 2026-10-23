@@ -1,7 +1,9 @@
 package com.samarth.matching.book;
 
 import com.samarth.matching.model.Order;
+import com.samarth.matching.model.OrderBookSnapshot;
 import com.samarth.matching.model.OrderType;
+import com.samarth.matching.model.PriceLevel;
 import com.samarth.matching.model.Side;
 import com.samarth.matching.model.Trade;
 
@@ -99,6 +101,16 @@ public class OrderBook {
 
     public synchronized boolean isEmpty() {
         return bids.isEmpty() && asks.isEmpty();
+    }
+
+    public synchronized OrderBookSnapshot snapshot() {
+        return new OrderBookSnapshot(symbol, toLevels(bids), toLevels(asks));
+    }
+
+    private List<PriceLevel> toLevels(TreeMap<Long, ArrayDeque<Order>> sideBook) {
+        List<PriceLevel> levels = new ArrayList<>();
+        sideBook.forEach((price, queue) -> levels.add(new PriceLevel(price, totalQuantity(queue))));
+        return levels;
     }
 
     public synchronized void print() {
